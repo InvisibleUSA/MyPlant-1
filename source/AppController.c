@@ -53,136 +53,54 @@
 #include "XdkAppInfo.h"
 #undef BCDS_MODULE_ID  /* Module ID define before including Basics package*/
 #define BCDS_MODULE_ID XDK_APP_MODULE_ID_APP_CONTROLLER
-
-/* own header files */
 #include "AppController.h"
-
-/* system header files */
 #include <stdio.h>
-
-/* additional interface header files */
 #include "BCDS_CmdProcessor.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
-/* constant definitions ***************************************************** */
 
-/* local variables ********************************************************** */
+#define TIMERBLOCKTIME UINT32_C(0xffff)
 
-static CmdProcessor_T * AppCmdProcessor;/**< Handle to store the main Command processor handle to be used by run-time event driven threads */
 
-static xTaskHandle AppControllerHandle = NULL;/**< OS thread handle for Application controller to be used by run-time blocking threads */
-
-/* global variables ********************************************************* */
-
-/* inline functions ********************************************************* */
-
-/* local functions ********************************************************** */
-
-/**
- * @brief Responsible for controlling application control flow.
- * Any application logic which is blocking in nature or fixed time dependent
- * can be placed here.
- *
- * @param[in] pvParameters
- * FreeRTOS task handle. Could be used if more than one thread is using this function block.
- */
-static void AppControllerFire(void* pvParameters)
+static void timerCallback(xTimerHandle th)
 {
-    BCDS_UNUSED(pvParameters);
+    BCDS_UNUSED(th);
 
-    /* A function that implements a task must not exit or attempt to return to
-     its caller function as there is nothing to return to. */
-    while (1)
-    {
-        /* code to implement application control flow */
-        ;
-    }
+
 }
 
-/**
- * @brief To enable the necessary modules for the application
- *
- * @param [in] param1
- * A generic pointer to any context data structure which will be passed to the function when it is invoked by the command processor.
- *
- * @param [in] param2
- * A generic 32 bit value  which will be passed to the function when it is invoked by the command processor..
- */
-static void AppControllerEnable(void * param1, uint32_t param2)
+static Retcode_T initializeSensors()
 {
-    BCDS_UNUSED(param1);
-    BCDS_UNUSED(param2);
-    Retcode_T retcode = RETCODE_OK;
-
-    /* @todo - Enable necessary modules for the application and check their return values */
-    if (RETCODE_OK == retcode)
-    {
-        if (pdPASS != xTaskCreate(AppControllerFire, (const char * const ) "AppController", TASK_STACK_SIZE_APP_CONTROLLER, NULL, TASK_PRIO_APP_CONTROLLER, &AppControllerHandle))
-        {
-            retcode = RETCODE(RETCODE_SEVERITY_ERROR, RETCODE_OUT_OF_RESOURCES);
-        }
-    }
-    if (RETCODE_OK != retcode)
-    {
-        printf("AppControllerEnable : Failed \r\n");
-        Retcode_RaiseError(retcode);
-        assert(0); /* To provide LED indication for the user */
-    }
+	Retcode_T ret = RETCODE_UNINITIALIZED;
+	return ret;
 }
 
-/**
- * @brief To setup the necessary modules for the application
- *
- * @param [in] param1
- * A generic pointer to any context data structure which will be passed to the function when it is invoked by the command processor.
- *
- * @param [in] param2
- * A generic 32 bit value  which will be passed to the function when it is invoked by the command processor..
- */
-static void AppControllerSetup(void * param1, uint32_t param2)
-{
-    BCDS_UNUSED(param1);
-    BCDS_UNUSED(param2);
-    Retcode_T retcode = RETCODE_OK;
-
-    /* @todo - Setup the necessary modules required for the application */
-
-    retcode = CmdProcessor_Enqueue(AppCmdProcessor, AppControllerEnable, NULL, UINT32_C(0));
-    if (RETCODE_OK != retcode)
-    {
-        printf("AppControllerSetup : Failed \r\n");
-        Retcode_RaiseError(retcode);
-        assert(0); /* To provide LED indication for the user */
-    }
-}
-
-/* global functions ********************************************************* */
-
-/** Refer interface header for description */
 void AppController_Init(void * cmdProcessorHandle, uint32_t param2)
 {
-    BCDS_UNUSED(param2);
+	if (cmdProcessorHandle == NULL)
+	{
+		printf("Command processor handle is null \n\r");
+		Retcode_RaiseError(RETCODE(RETCODE_SEVERITY_ERROR, RETCODE_NULL_POINTER));
+		assert(false);
+		return;
+	}
+	BCDS_UNUSED(param2);
 
-    Retcode_T retcode = RETCODE_OK;
+	Retcode_T ret = initializeSensors();
+	if (RETCODE_SUCCESS != ret)
+	{
+		Retcode_RaiseError(ret);
+		assert(false);
+		return;
+	}
 
-    if (cmdProcessorHandle == NULL)
+    xTimerHandle th = xTimerCreate((const char* const) "measure", pdMS_TO_TICKS(1000), pdTRUE, NULL, timerCallback);
+    if (NULL == th)
     {
-        printf("AppController_Init : Command processor handle is NULL \r\n");
-        retcode = RETCODE(RETCODE_SEVERITY_ERROR, RETCODE_NULL_POINTER);
+    	Retcode_RaiseError(RETCODE(RETCODE_SEVERITY_ERROR, RETCODE_NULL_POINTER));
+    	assert(false);
+    	return;
     }
-    else
-    {
-        AppCmdProcessor = (CmdProcessor_T *) cmdProcessorHandle;
-        retcode = CmdProcessor_Enqueue(AppCmdProcessor, AppControllerSetup, NULL, UINT32_C(0));
-    }
-
-    if (RETCODE_OK != retcode)
-    {
-        Retcode_RaiseError(retcode);
-        assert(0); /* To provide LED indication for the user */
-    }
+    xTimerStart(th, TIMERBLOCKTIME);
 }
-
-/**@} */
-/** ************************************************************************* */
