@@ -60,15 +60,24 @@
 #include "FreeRTOS.h"
 #include "timers.h"
 
-// MAC
-#include "netcfg.h"
-
-
 #include "sensors.h"
+#include "mqtt.h"
 
-static _u8 MACAddress[6];
+#define TOPIC_LENGTH 25
+char topicTemperature[TOPIC_LENGTH] = "temperature/";
+char topicHumidity[TOPIC_LENGTH] = "humidity/";
+char topicMoisture[TOPIC_LENGTH] = "moisture/";
+char topicLight[TOPIC_LENGTH] = "light/";
+char topicPressure[TOPIC_LENGTH] = "pressure/";
 
-
+static void initTopics(void)
+{
+	strncat(topicTemperature, (const char*)MACAddressStr, TOPIC_LENGTH);
+	strncat(topicHumidity,    (const char*)MACAddressStr, TOPIC_LENGTH);
+	strncat(topicMoisture,    (const char*)MACAddressStr, TOPIC_LENGTH);
+	strncat(topicLight,       (const char*)MACAddressStr, TOPIC_LENGTH);
+	strncat(topicPressure,    (const char*)MACAddressStr, TOPIC_LENGTH);
+}
 static void timerCallback(xTimerHandle th)
 {
     BCDS_UNUSED(th);
@@ -77,7 +86,7 @@ static void timerCallback(xTimerHandle th)
 
     uint8_t  humidity    = UINT8_MAX;
     uint8_t  moisture    = UINT8_MAX;
-    int32_t temperature  = INT32_MAX;
+    int32_t  temperature = INT32_MAX;
     uint32_t illuminance = UINT32_MAX;
     uint32_t pressure    = UINT32_MAX;
 
@@ -93,6 +102,20 @@ static void timerCallback(xTimerHandle th)
 
 
     moisture = measureMoisture();
+
+
+    char buffer[20];
+
+    snprintf(buffer, 20, "%ld", temperature);
+    mqtt_publish(topicTemperature, buffer);
+    snprintf(buffer, 20, "%lu", illuminance);
+    mqtt_publish(topicLight, buffer);
+    snprintf(buffer, 20, "%lu", pressure);
+    mqtt_publish(topicPressure, buffer);
+    snprintf(buffer, 20, "%u", humidity);
+    mqtt_publish(topicHumidity, buffer);
+    snprintf(buffer, 20, "%u", moisture);
+    mqtt_publish(topicMoisture, buffer);
 }
 
 void AppController_Init(void * cmdProcessorHandle, uint32_t param2)
@@ -114,10 +137,17 @@ void AppController_Init(void * cmdProcessorHandle, uint32_t param2)
 		return;
 	}
 
-	_u8 len = SL_MAC_ADDR_LEN;
-	sl_NetCfgGet(SL_MAC_ADDRESS_GET, NULL, &len, (_u8*)&MACAddress);
+	ret = mqtt_init("EventiLoccioni", "welcometoloccioni", "192.168.33.161", 1883);
+	if (RETCODE_SUCCESS != ret)
+	{
+		Retcode_RaiseError(ret);
+		assert(false);
+		return;
+	}
 
-    xTimerHandle th = xTimerCreate((const char* const) "measure", pdMS_TO_TICKS(5000), pdTRUE, NULL, timerCallback);
+	initTopics();
+
+    xTimerHandle th = xTimerCreate((const char* const) "measure", pdMS_TO_TICKS(60000), pdTRUE, NULL, timerCallback);
     if (NULL == th)
     {
     	Retcode_RaiseError(RETCODE(RETCODE_SEVERITY_ERROR, RETCODE_NULL_POINTER));
