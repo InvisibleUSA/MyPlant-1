@@ -74,6 +74,7 @@ static retcode_t event_handler(MqttSession_T* session, MqttEvent_t event,
               const MqttEventData_t* eventData)
 {
 	BCDS_UNUSED(session);
+	return RC_OK;
 	printf("Event handler called\n\r");
 	switch(event)
 	{
