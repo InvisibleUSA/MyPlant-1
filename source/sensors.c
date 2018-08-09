@@ -34,7 +34,7 @@ Retcode_T measureEnvironment(uint8_t* humidity, int32_t* temperature, uint32_t* 
 
 	*humidity = value.humidity;
 	*temperature = value.temperature;
-	*pressure = value.pressure;
+	*pressure = value.pressure / 100;
 
 	return ret;
 }
@@ -90,3 +90,4 @@ Retcode_T initializeSensors(void)
 
 	return ret;
 }
+
