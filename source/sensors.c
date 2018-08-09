@@ -41,6 +41,17 @@ Retcode_T measureEnvironment(uint8_t* humidity, int32_t* temperature, uint32_t* 
 
 uint8_t measureMoisture(void)
 {
+	// ADC for external sensor
+	GPIO_PinModeSet(gpioPortD, 6, gpioModeInputPull, 0);
+	GPIO_PinOutClear(gpioPortD, 6);
+
+	ADC_InitSingle_TypeDef channelInit = ADC_INITSINGLE_DEFAULT;
+	channelInit.reference = adcRef2V5;
+	channelInit.resolution = adcRes12Bit;
+	channelInit.input = adcSingleInpCh3;
+    ADC_InitSingle(ADC0, &channelInit);
+
+
 	uint32_t AdcSample = 0;
 
 	while ((ADC0->STATUS & (ADC_STATUS_SINGLEACT)) && (BSP_UNLOCKED == ADCLock));
@@ -57,6 +68,7 @@ uint8_t measureMoisture(void)
 	AdcSample = 0xFFF & ADC_DataSingleGet(ADC0);
 
 	//printf("Measured value = %lu/4096 ; %.2f/2.5V\n\r", AdcSample, (float) AdcSample * 2.5 / 4096);
+
 	__disable_irq();
 	ADCLock = BSP_UNLOCKED;
 	__enable_irq();
@@ -77,16 +89,6 @@ Retcode_T initializeSensors(void)
 	ret = Environmental_init(xdkEnvironmental_BME280_Handle);
 	if (RETCODE_SUCCESS != ret)
 			return ret;
-
-	// ADC for external sensor
-	GPIO_PinModeSet(gpioPortD, 6, gpioModeInputPull, 0);
-	GPIO_PinOutClear(gpioPortD, 6);
-
-	ADC_InitSingle_TypeDef channelInit = ADC_INITSINGLE_DEFAULT;
-	channelInit.reference = adcRef2V5;
-	channelInit.resolution = adcRes12Bit;
-	channelInit.input = adcSingleInpCh6;
-    ADC_InitSingle(ADC0, &channelInit);
 
 	return ret;
 }
