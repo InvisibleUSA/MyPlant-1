@@ -60,7 +60,9 @@
 #include "FreeRTOS.h"
 #include "timer.h"
 #include "XdkSensorHandle.h"
+#include "netcfg.h"
 
+static _u8 MACAddress[6];
 
 static uint32_t measureLight(void)
 {
@@ -73,7 +75,7 @@ static uint32_t measureLight(void)
 	return value / 1000;
 }
 
-static Retcode_T processEnvironment(uint32_t* humidity, uint32_t* temperature)
+static Retcode_T processEnvironment(uint32_t* humidity, uint32_t* temperature, uint32_t* pressure)
 {
 	Environmental_Data_T value = {0,0,0};
 
@@ -81,6 +83,7 @@ static Retcode_T processEnvironment(uint32_t* humidity, uint32_t* temperature)
 
 	*humidity = value.humidity;
 	*temperature = value.temperature;
+	*pressure = value.pressure;
 
 	return ret;
 }
@@ -90,16 +93,18 @@ static void timerCallback(xTimerHandle th)
     BCDS_UNUSED(th);
 
 
-    uint32_t humidity = UINT32_MAX;
+    uint32_t humidity    = UINT32_MAX;
     uint32_t temperature = UINT32_MAX;
-    uint32_t illuminance= UINT32_MAX;
+    uint32_t illuminance = UINT32_MAX;
+    uint32_t pressure    = UINT32_MAX;
+
     bool success = true;
 
 
     illuminance = measureLight();
     success &= (illuminance != UINT32_MAX);
 
-    if (RETCODE_SUCCESS != processEnvironment(&humidity, &temperature))
+    if (RETCODE_SUCCESS != processEnvironment(&humidity, &temperature, &pressure))
     {
     	//TODO report error
     }
@@ -137,6 +142,9 @@ void AppController_Init(void * cmdProcessorHandle, uint32_t param2)
 		assert(false);
 		return;
 	}
+
+	_u8 len = SL_MAC_ADDR_LEN;
+	sl_NetCfgGet(SL_MAC_ADDRESS_GET, NULL, &len, (_u8*)&MACAddress);
 
     xTimerHandle th = xTimerCreate((const char* const) "measure", pdMS_TO_TICKS(5000), pdTRUE, NULL, timerCallback);
     if (NULL == th)
