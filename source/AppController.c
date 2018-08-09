@@ -73,21 +73,24 @@ static void timerCallback(xTimerHandle th)
 {
     BCDS_UNUSED(th);
 
+    bool     success     = true;
 
     uint8_t  humidity    = UINT8_MAX;
     uint8_t  moisture    = UINT8_MAX;
-    uint32_t temperature = UINT32_MAX;
+    int32_t temperature  = INT32_MAX;
     uint32_t illuminance = UINT32_MAX;
     uint32_t pressure    = UINT32_MAX;
-    bool     success     = true;
+
 
     illuminance = measureLight();
     success &= (illuminance != UINT32_MAX);
+
 
     if (RETCODE_SUCCESS != measureEnvironment(&humidity, &temperature, &pressure))
     {
     	//TODO report error
     }
+
 
     moisture = measureMoisture();
 }
