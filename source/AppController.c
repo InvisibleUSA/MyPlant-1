@@ -53,26 +53,69 @@
 #include "XdkAppInfo.h"
 #undef BCDS_MODULE_ID  /* Module ID define before including Basics package*/
 #define BCDS_MODULE_ID XDK_APP_MODULE_ID_APP_CONTROLLER
+
 #include "AppController.h"
 #include <stdio.h>
 #include "BCDS_CmdProcessor.h"
 #include "FreeRTOS.h"
-#include "task.h"
+#include "timer.h"
+#include "XdkSensorHandle.h"
 
 
-#define TIMERBLOCKTIME UINT32_C(0xffff)
+static uint32_t measureLight(void)
+{
+	uint32_t value = 0;
+	Retcode_T ret = LightSensor_readLuxData(xdkLightSensor_MAX44009_Handle, &value);
+	if (RETCODE_SUCCESS != ret)
+	{
+		return UINT32_MAX;
+	}
+	return value / 1000;
+}
 
+static Retcode_T processEnvironment(uint32_t* humidity, uint32_t* temperature)
+{
+	Environmental_Data_T value = {0,0,0};
+
+	Retcode_T ret = Environmental_readCompensatedData(xdkEnvironmental_BME280_Handle, &value);
+
+	*humidity = value.humidity;
+	*temperature = value.temperature;
+
+	return ret;
+}
 
 static void timerCallback(xTimerHandle th)
 {
     BCDS_UNUSED(th);
 
 
+    uint32_t humidity = UINT32_MAX;
+    uint32_t temperature = UINT32_MAX;
+    uint32_t illuminance= UINT32_MAX;
+    bool success = true;
+
+
+    illuminance = measureLight();
+    success &= (illuminance != UINT32_MAX);
+
+    if (RETCODE_SUCCESS != processEnvironment(&humidity, &temperature))
+    {
+    	//TODO report error
+    }
 }
 
 static Retcode_T initializeSensors()
 {
 	Retcode_T ret = RETCODE_UNINITIALIZED;
+
+	// Light Sensor
+	ret = LightSensor_init(xdkLightSensor_MAX44009_Handle);
+	if (RETCODE_SUCCESS != ret)
+		return ret;
+
+	// Temperature, atmospheric humidity
+	ret = Environmental_init(xdkEnvironmental_BME280_Handle);
 	return ret;
 }
 
@@ -95,12 +138,14 @@ void AppController_Init(void * cmdProcessorHandle, uint32_t param2)
 		return;
 	}
 
-    xTimerHandle th = xTimerCreate((const char* const) "measure", pdMS_TO_TICKS(1000), pdTRUE, NULL, timerCallback);
+    xTimerHandle th = xTimerCreate((const char* const) "measure", pdMS_TO_TICKS(5000), pdTRUE, NULL, timerCallback);
     if (NULL == th)
     {
     	Retcode_RaiseError(RETCODE(RETCODE_SEVERITY_ERROR, RETCODE_NULL_POINTER));
     	assert(false);
     	return;
     }
+
+    const uint32_t TIMERBLOCKTIME = UINT32_C(0xffff);
     xTimerStart(th, TIMERBLOCKTIME);
 }
