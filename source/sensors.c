@@ -39,6 +39,7 @@ Retcode_T measureEnvironment(uint8_t* humidity, int32_t* temperature, uint32_t* 
 	return ret;
 }
 
+#include "BCDS_BSP_Charger_BQ2407X.h"
 uint8_t measureMoisture(void)
 {
 	// ADC for external sensor
@@ -48,7 +49,7 @@ uint8_t measureMoisture(void)
 	ADC_InitSingle_TypeDef channelInit = ADC_INITSINGLE_DEFAULT;
 	channelInit.reference = adcRef2V5;
 	channelInit.resolution = adcRes12Bit;
-	channelInit.input = adcSingleInpCh3;
+	channelInit.input = adcSingleInpCh6;
     ADC_InitSingle(ADC0, &channelInit);
 
 
@@ -67,13 +68,14 @@ uint8_t measureMoisture(void)
 
 	AdcSample = 0xFFF & ADC_DataSingleGet(ADC0);
 
-	//printf("Measured value = %lu/4096 ; %.2f/2.5V\n\r", AdcSample, (float) AdcSample * 2.5 / 4096);
+	//printf("Measured value = %lu/4096 ; %.2f/2.5V; %lu%%/100%%\n\r", AdcSample, (float) AdcSample * 2.5 / 4096, AdcSample * 100 / 2300);
 
 	__disable_irq();
 	ADCLock = BSP_UNLOCKED;
 	__enable_irq();
 
-	return AdcSample * 100 / 4096;
+	AdcSample = AdcSample * 100 / 2300;
+	return (AdcSample > 100)? 100: AdcSample;
 }
 
 Retcode_T initializeSensors(void)
